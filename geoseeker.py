@@ -10,13 +10,16 @@
 
 # you'll need :
 # pip install Pillow requests geoclip anthropic
-
+# pip install geoclip
+# pip install "transformers<4.40" --force-reinstall
 
 import sys
 import os
 import base64
 from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
+
+from geoclip import GeoCLIP
 
 # as default, always try EXIF
 
@@ -137,6 +140,26 @@ def coords_with_exif(lat, lon):
 
     print(f"https://www.google.com/maps?q={lat},{lon}")
 
+
+
+def geoclip(path):
+
+    top_k = 5
+
+    print("using geoclip...")
+
+    # uses clip type image encoder, converts photo to a vector
+    # a location encoder transforms millions of gps coordinates into vectors
+    # it's trained with the image
+    # INFERENCE -> compares pic with candidate coordinates and returns most likely
+
+    model = GeoCLIP()
+    top_pred_gps, top_pred_prob = model.predict(path, top_k = top_k)
+        
+
+
+
+
 def main():
     # python3 geoseeker.py img_path
     if len(sys.argv) != 2:
@@ -158,7 +181,7 @@ def main():
 
         else:
             print("Not enough metadata, will resort to geoclip")
-
+            geoclip(path)
 
 if __name__ == "__main__":
     main()
