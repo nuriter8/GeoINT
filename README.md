@@ -2,6 +2,14 @@
 
 **GeoSeeker** is a Python tool that geolocates a photo using three fallback layers of increasing complexity — starting with exact metadata, and falling back to AI-based visual reasoning when no metadata is available.
 
+## How to run it
+1. python3 geoseeker.py
+2. open http://127.0.0.1:5500 on your browser
+3. upload you picture and click 'Analyze'
+4. if you want detailed data, obtain an anthropic api key and paste it on the Claude vision section
+
+None of the data you provide is stored
+
 ## How it works
 
 1. **EXIF extraction** (exact, free)
