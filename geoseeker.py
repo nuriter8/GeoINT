@@ -11,7 +11,12 @@
 # you'll need :
 # pip install Pillow requests geoclip anthropic
 # pip install geoclip
-# pip install "transformers<4.40" --force-reinstall
+# pip install torch==2.2.0 torchvision==0.17.0 --index-url https://download.pytorch.org/whl/cpu
+# pip install torch==2.2.0 torchvision==0.17.0
+# python3 -c "import numpy; print(numpy.__version__)"
+# pip install "numpy<2.0" --force-reinstall
+# import traceback
+# pip install anthropic
 
 import sys
 import os
@@ -20,6 +25,11 @@ from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
 
 from geoclip import GeoCLIP
+import anthropic
+
+#from google import genai
+from google.genai import types
+import google.generativeai as genai
 
 # as default, always try EXIF
 
@@ -30,7 +40,7 @@ def get_exif(img_path):
     exif_data = image.getexif()
 
     if not exif_data:
-        print("gps location not in metadata :( )")
+        print("gps location not in metadata :( ")
         return None
 
     else:
@@ -70,6 +80,7 @@ def get_exif(img_path):
         lat, lon = get_exif_coordinates(exif)
         print(">>>>>" + str(lat) + " and " + str(lon))
         if(lat and lon):
+            show_coords("GEOCLIP", lat, lon)
             return True
         else:
             return False
@@ -99,8 +110,9 @@ def get_gps_data(exif_data):
 
 def to_degrees(value):
     d, m, s = value
-
-    return float(d) + float(m) / 60.0 + float(s) / 3600.0
+    degrees = float(d) + float(m) / 60.0 + float(s) / 3600.0
+    print(f"{value} to degrees: {degrees}")
+    return degrees
 
 
 
@@ -134,29 +146,102 @@ def get_exif_coordinates(exif_data):
 
         return lat, lon
 
-def coords_with_exif(lat, lon):
+def show_coords(method, lat, lon):
 
-    print("COORDINATES WITH EXIF " + str(lat) + ", " + str(lon))
+    print(f"COORDINATES WITH {method}, {lat} , {lon}")
+    print(f"https://www.google.com/maps?q={lat},{lon} \n")
+    
 
-    print(f"https://www.google.com/maps?q={lat},{lon}")
+
+
 
 
 
 def geoclip(path):
-
+    
     top_k = 5
-
+    
     print("using geoclip...")
-
-    # uses clip type image encoder, converts photo to a vector
-    # a location encoder transforms millions of gps coordinates into vectors
-    # it's trained with the image
-    # INFERENCE -> compares pic with candidate coordinates and returns most likely
-
+    
     model = GeoCLIP()
-    top_pred_gps, top_pred_prob = model.predict(path, top_k = top_k)
-        
+    try:
+        top_pred_gps, top_pred_prob = model.predict(path, top_k=top_k)
 
+        # in top preds gps -> saved pairs of latitude and longitude.
+        # 
+        
+        print(f"Top {top_k} GPS predictions \n")
+        
+        
+        for i in range(top_k):
+            
+            lat, lon = top_pred_gps[i]
+            print(f"Prediction {i+1}: ({lat:.6f}, {lon:.6f}) | prob: {top_pred_prob[i]:.6f}")
+            
+            show_coords("GEOCLIP", lat, lon)
+
+    except Exception as e:
+        print(f"Error in GEOCLIP: {e}")
+        
+        traceback.print_exc()
+        
+        
+        
+        
+def claudevision(path):
+    api_key = ""
+    #while not api_key:
+        
+     #   api_key = input("paste your anthropic API KEY: ").strip()
+        
+        
+      #  if not api_key:
+       #     print("you need a valid anthropic API KEY, try again...")
+            
+    # api_key is not empty
+    
+    with open(path, "rb") as f:
+        img_b64 = base64.standard_b64encode(f.read()).decode("utf-8")
+        
+    ext = path.split(".")[-1].lower()
+    print(ext)
+    
+    
+    media_type = f"image/{ext}"
+    
+    
+    client = anthropic.Anthropic(api_key = api_key)
+    
+    
+    response = client.messages.create(
+        
+        model = "claude-sonnet-4-6",
+        max_tokens = 600,
+        
+        messages=[{
+            "role": "user",
+            "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": img_b64}},
+                {"type": "text", "text": (
+                "use plain text, no markdown"
+                "Act as an expert in visual geolocation (GeoGuessr style). "
+                "Analyze visible clues: language on signs, license plate type, "
+                "analyze visible cues about the main characters of the picture if there are any, if not, common attributes among the people in the picture"
+                "which side of the road traffic drives on, vegetation, climate, architecture, traffic signs, stores, people, culture, etc"
+                "Give your best estimate of country and region/city, and explain which clues you're basing it on. "
+                "Be honest about your level of uncertainty"
+                "give possible coordinates"
+                
+                )}
+            ]
+        }]
+
+    )
+    
+    
+    print(response.content[0].text)
+    
+  
 
 
 
@@ -182,6 +267,11 @@ def main():
         else:
             print("Not enough metadata, will resort to geoclip")
             geoclip(path)
+            
+            print("trying with claude vision...")
+            claudevision(path)
+            
+            
 
 if __name__ == "__main__":
     main()
