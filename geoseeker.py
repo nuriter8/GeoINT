@@ -190,15 +190,15 @@ def geoclip(path):
         
 def claudevision(path):
     api_key = ""
-    #while not api_key:
+    while not api_key:
         
-     #   api_key = input("paste your anthropic API KEY: ").strip()
+        api_key = input("paste your anthropic API KEY: ").strip()
         
         
-      #  if not api_key:
-       #     print("you need a valid anthropic API KEY, try again...")
+        if not api_key:
+            print("you need a valid anthropic API KEY, try again...")
             
-    # api_key is not empty
+
     
     with open(path, "rb") as f:
         img_b64 = base64.standard_b64encode(f.read()).decode("utf-8")
@@ -242,6 +242,7 @@ def claudevision(path):
     print(response.content[0].text)
     
   
+# since anthropic api key is not free, I'll add gemini as option
 
 
 
