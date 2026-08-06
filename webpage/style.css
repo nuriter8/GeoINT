@@ -21,18 +21,26 @@ body {
     border: 1px solid #ff6600;
     padding: 22px 20px 28px;
     box-shadow: 6px 6px 0 rgba(0,0,0,0.2);
-    display: flex;
     gap: 16px;
 }
 
 .innerbox {
-    max-width: 680px;
+    
     width: 100%;
     background: #beb3a0;
+    margin: 10px;
     border: 1px solid #85776e;
     padding: 22px 20px 28px;
-    box-shadow: 6px 6px 0 rgba(0,0,0,0.2);
+   
 
+}
+
+.orderbox {
+
+    width: 100%;
+    background: #beb3a0;
+    padding: 22px 20px 28px;
+    display: flex;
 }
 
 h1 {

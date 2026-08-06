@@ -10,65 +10,69 @@
 
 <div class="box">
 
-    <div class="innerbox">
-        <div class="eyebrow">
-            <span class="dot"></span> GEOSEEKER
-        </div>
+    <div class="orderbox">
 
-        <h1>Where was this photo taken?</h1>
-        <div class="sub">Upload an image EXIF GPS or GeoCLIP estimate</div>
-
-        <div class="scanbar" id="scanbar">
-            <div class="sweep"></div>
-        </div>
-
-        <div class="panel">
-            <div class="dropzone" id="dropzone">
-                <div class="label">drop image or click</div>
-                <p>JPG / PNG</p>
-                <input type="file" id="fileInput" accept="image/*" />
+        <div class="innerbox">
+            <div class="eyebrow">
+                <span class="dot"></span> GEOSEEKER
             </div>
 
-            <div class="preview" id="preview">
-                <img id="previewImg" alt="preview" />
+            <h1>Where was this photo taken?</h1>
+            <div class="sub">Upload an image EXIF GPS or GeoCLIP estimate</div>
+
+            <div class="scanbar" id="scanbar">
+                <div class="sweep"></div>
             </div>
 
-            <div class="actions">
-                <button id="analyzeBtn" disabled>Analyze</button>
-                <button id="resetBtn" class="ghost" style="display:none;">New image</button>
+            <div class="panel">
+                <div class="dropzone" id="dropzone">
+                    <div class="label">drop image or click</div>
+                    <p>JPG / PNG</p>
+                    <input type="file" id="fileInput" accept="image/*" />
+                </div>
+
+                <div class="preview" id="preview">
+                    <img id="previewImg" alt="preview" />
+                </div>
+
+                <div class="actions">
+                    <button id="analyzeBtn" disabled>Analyze</button>
+                    <button id="resetBtn" class="ghost" style="display:none;">New image</button>
+                </div>
+
+                <div class="status" id="status"></div>
             </div>
 
-            <div class="status" id="status"></div>
+            <div class="panel" id="resultsPanel" style="display:none;">
+                <div class="readout" id="readoutLine"></div>
+                <div id="resultsBody"></div>
+            </div>
+
+            <div class="panel vis-panel" id="visionPanel" style="display:none;">
+                <div class="eyebrow" style="margin-bottom:8px;">
+                    <span class="dot"></span> Claude Vision (optional)
+                </div>
+                <label for="apiKey">Anthropic API key</label>
+                <input type="password" id="apiKey" placeholder="sk-ant-..." />
+                <div class="actions">
+                    <button id="visionBtn">Ask Claude</button>
+                </div>
+                <div class="status" id="visionStatus"></div>
+                <div class="vis-output" id="visionOutput"></div>
+            </div>
+
+            
+
         </div>
 
-        <div class="panel" id="resultsPanel" style="display:none;">
-            <div class="readout" id="readoutLine"></div>
-            <div id="resultsBody"></div>
-        </div>
 
-        <div class="panel vis-panel" id="visionPanel" style="display:none;">
-            <div class="eyebrow" style="margin-bottom:8px;">
-                <span class="dot"></span> Claude Vision (optional)
+        <div class="innerbox">
+
+            <div class="clues" id="clues" style="display:none;">
+                <div class="clues-title">CLUES</div>
+                <div id="ocrOutput"></div>
             </div>
-            <label for="apiKey">Anthropic API key</label>
-            <input type="password" id="apiKey" placeholder="sk-ant-..." />
-            <div class="actions">
-                <button id="visionBtn">Ask Claude</button>
-            </div>
-            <div class="status" id="visionStatus"></div>
-            <div class="vis-output" id="visionOutput"></div>
-        </div>
 
-        
-
-    </div>
-
-
-    <div class="innerbox">
-
-        <div class="clues" id="clues" style="display:none;">
-            <div class="clues-title">CLUES</div>
-            <div id="ocrOutput"></div>
         </div>
 
     </div>

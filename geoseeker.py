@@ -1,4 +1,5 @@
 # LEVELS
+# 0. photo adaptation : CLAHE, Unsharp mask
 # 1. EXIF: if the photo has embedded GPS (metadata), I Just extract it for free (no ai)
 # 2. GeoCLIP: CLIP style model (no ai), predicts coordinates based on visual content of the picture
 # 3. Claude vision: multimodal model that reasons with visual cues (buildings, roads, architecture, panels)
@@ -25,6 +26,13 @@
 # sudo apt-get install tesseract-ocr
 # sudo apt-get install tesseract-ocr-spa tesseract-ocr-eng
 # pip install pytesseract requests
+# pip install opencv-python
+# pip install "transformers==4.36.2" --force-reinstall
+# pip install easyocr
+# pip install "transformers==4.36.2" --force-reinstall
+# python3 -c "import numpy; print(numpy.__version__)"
+# pip install "numpy<2.0" --force-reinstall
+
 
 
 import sys
@@ -40,11 +48,53 @@ import anthropic
 import google.generativeai as genai
 import json
 import pytesseract
+import cv2
+import numpy as np
+
+import easyocr
+
+print("loading EasyOCR model...")
+ocr_reader = easyocr.Reader(['en', 'es'], gpu=False)
+print("easyocr loaded")
+
 
 
 
 app = Flask(__name__, static_folder='webpage', static_url_path='')
 CORS(app)
+
+def save_preprocessed(cv2_image, path):
+
+    rgb = cv2.cvtColor(cv2_image, cv2.COLOR_BGR2RGB)
+    pil_img = Image.fromarray(rgb)
+    pil_img.save(path, "JPEG", quality=95)
+    
+    
+    
+    
+def preprocess_image(img_path):
+    
+    img = cv2.imread(img_path)
+    
+    # clahe: separates L (LIGHT) and A, B (COLOR INFO)
+    lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
+    
+    
+    # clipLimit: contrast
+    # tileGridSize: divides img in blocks of 8x8, equalizes each one separately
+    
+    clahe = cv2.createCLAHE(clipLimit= 3.0, tileGridSize= (8,8))
+    l_corrected = clahe.apply(l)
+    balanzed = cv2.merge((l_corrected, a, b))
+    balanzed = cv2.cvtColor(balanzed, cv2.COLOR_LAB2BGR)
+    
+    # SHARPNESS
+    no_focus = cv2.GaussianBlur(balanzed, (0, 0), sigmaX=3)
+    sharp = cv2.addWeighted(balanzed, 1.5, no_focus, -0.5, 0)
+    
+    return sharp
+
 
 def get_exif(img_path):
     image = Image.open(img_path)
@@ -152,7 +202,7 @@ def geoclip(path):
             
         return results
     except Exception as e:
-        print(f"Error en GEOCLIP: {e}")
+        print(f"Error in GEOCLIP: {e}")
         traceback.print_exc()
         return None
 
@@ -199,13 +249,29 @@ def claudevision(path, api_key):
 
 def extract_text_tesseract(img_path):
     image = Image.open(img_path)
-    text = pytesseract.image_to_string(image, lang = "spa+eng")
+    text = pytesseract.image_to_string(image, lang="spa+eng+fra+deu+ita")
     
     #text = "test"
-    print("TEXT IN IMAGE:" + text)
+
     
     return text.strip()
     
+    
+def extract_text_easyocr(img_path):
+    
+    
+    results = ocr_reader.readtext(img_path)
+
+   
+    texts = [text for (_, text, trust) in results if trust > 0.35]
+
+    if not texts:
+        return ""
+
+    final_text = " | ".join(texts)
+    print("TEXT IN IMAGE (EasyOCR):" + final_text)
+
+    return final_text
 
 # FLASK
 @app.route('/')
@@ -216,22 +282,25 @@ def index():
 def static_files(path):
     return send_from_directory('webpage', path)
 
+    
+    
 @app.route('/api/analyze', methods=['POST'])
 def analyze():
     try:
         if 'image' not in request.files:
             return jsonify({'error': 'No image uploaded'}), 400
-        
         file = request.files['image']
         if file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
-        
+
         temp_path = 'temp_image.jpg'
         file.save(temp_path)
-        
+
+        preprocess_path = 'temp_img_preprocessed.jpg'
+
         try:
+        
             exif_result = get_exif(temp_path)
-            
             if exif_result:
                 response_data = {
                     'source': 'exif',
@@ -241,30 +310,35 @@ def analyze():
                     }
                 }
                 return jsonify(response_data)
-            
-            geoclip_results = geoclip(temp_path)
-            
+
+      
+            sharp = preprocess_image(temp_path)
+            save_preprocessed(sharp, preprocess_path)
+            geoclip_results = geoclip(preprocess_path)
+
             if geoclip_results:
-                
-                ocr_text = extract_text_tesseract(temp_path)
+                ocr_text = extract_text_easyocr(preprocess_path)
                 print(ocr_text)
-                
                 response_data = {
                     'source': 'geoclip',
-                    'geoclip': geoclip_results
+                    'geoclip': geoclip_results,
+                    'ocr': ocr_text
                 }
                 return jsonify(response_data)
-            
+
             return jsonify({'error': 'Could not determine location'}), 500
-            
+
         finally:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-                
+            for p in (temp_path, preprocess_path):
+                if os.path.exists(p):
+                    os.remove(p)
+
     except Exception as e:
         print(f"ERROR in analyze: {str(e)}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+    
+    
 
 @app.route('/api/vision', methods=['POST'])
 def vision():
@@ -306,4 +380,4 @@ if __name__ == '__main__':
             api_key = input("paste your anthropic API KEY: ").strip()
             claudevision(path, api_key)
     else:
-        app.run(debug=True, host='0.0.0.0', port=5504)
+        app.run(debug=True, host='0.0.0.0', port=5500, use_reloader=False)
