@@ -18,6 +18,26 @@
 
     let currentFile = null;
 
+
+    function openStreetMapCard(lat, lon, prob){
+        const card = document.createElement('div')
+        card.className = 'result-card';
+
+        const probHtml = (prob !== null) ? `<span class="prob">prob ${(prob * 100).toFixed(1)}%</span>` :'';
+        const mapSrc = `https://www.openstreetmap.org/export/embed.html?bbox=${lon-0.01}%2C${lat-0.01}%2C${lon+0.01}%2C${lat+0.01}&marker=${lat}%2C${lon}`;
+
+        card.innerHTML = `
+            <iframe 
+                src="${mapSrc}" 
+                loading="lazy"
+                frameborder="0"
+                style="width:100%; height:200px; display:block; border:0;">
+            </iframe>
+        `;
+
+        return card;
+    }
+
     function setFile(file) {
         currentFile = file;
         const url = URL.createObjectURL(file);
@@ -159,6 +179,9 @@
             frameWrap.style.display = open ? 'none' : 'block';
             toggle.textContent = open ? '▶ Street View' : '▼ hide';
         });
+
+        card.appendChild(openStreetMapCard(lat, lon, prob));
+
         return card;
     }
 
