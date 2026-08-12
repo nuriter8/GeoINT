@@ -2,6 +2,9 @@
     const dropzone = document.getElementById('dropzone');
     const fileInput = document.getElementById('fileInput');
     const preview = document.getElementById('preview');
+    const clues = document.getElementById('clues');
+    const ocrOutput = document.getElementById('ocrOutput')
+
     const previewImg = document.getElementById('previewImg');
     const analyzeBtn = document.getElementById('analyzeBtn');
     const resetBtn = document.getElementById('resetBtn');
@@ -15,6 +18,7 @@
     const visionStatus = document.getElementById('visionStatus');
     const visionOutput = document.getElementById('visionOutput');
     const apiKeyInput = document.getElementById('apiKey');
+
 
     let currentFile = null;
 
@@ -41,6 +45,10 @@
     function setFile(file) {
         currentFile = file;
         const url = URL.createObjectURL(file);
+
+        clues.style.display = 'block';
+        ocrOutput.textContent = 'scanning clues...'
+
         previewImg.src = url;
         preview.style.display = 'block';
         analyzeBtn.disabled = false;
@@ -123,7 +131,18 @@
                 resultsBody.appendChild(buildResultCard(data.exif.lat, data.exif.lon, null));
                 resultsPanel.style.display = 'block';
                 visionPanel.style.display = 'none';
+
+
             } else if (data.source === 'geoclip') {
+                
+                clues.style.display = 'block';
+
+                if (data.ocrOutput && data.ocrOutput.trim()) {
+                    ocrOutput.textContent = data.ocrOutput;
+                } else {
+                    ocrOutput.textContent = 'No text detected.';
+                }
+                
                 readoutLine.innerHTML = `<span>SOURCE</span><b>GEOCLIP · top 5 predictions</b>`;
                 resultsBody.innerHTML = '';
                 data.geoclip.forEach(p => {
@@ -131,6 +150,8 @@
                 });
                 resultsPanel.style.display = 'block';
                 visionPanel.style.display = 'block';
+
+
             } else {
                 throw new Error('Unknown source in response');
             }
@@ -229,7 +250,7 @@
         } catch (error) {
             console.error('Vision error:', error);
             visionStatus.className = 'status err';
-            visionStatus.textContent = 'Error: ' + error.message;
+            visionStatus.textContent = 'Error! : ' + error.message;
         } finally {
             visionBtn.disabled = false;
         }

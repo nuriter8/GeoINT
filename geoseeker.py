@@ -1,7 +1,9 @@
-# 3 LEVELS
+# LEVELS
 # 1. EXIF: if the photo has embedded GPS (metadata), I Just extract it for free (no ai)
 # 2. GeoCLIP: CLIP style model (no ai), predicts coordinates based on visual content of the picture
 # 3. Claude vision: multimodal model that reasons with visual cues (buildings, roads, architecture, panels)
+# 4. Tesseract: OCR, program to extract names, licence plates, traffic signs...
+# 5. Using plantNet (to-do)
 
 #reliability
 # EXIF: exact if metadata was provided
@@ -20,6 +22,10 @@
 # pip install flask
 # pip install flask_cors
 
+# sudo apt-get install tesseract-ocr
+# sudo apt-get install tesseract-ocr-spa tesseract-ocr-eng
+# pip install pytesseract requests
+
 
 import sys
 import os
@@ -33,7 +39,7 @@ from geoclip import GeoCLIP
 import anthropic
 import google.generativeai as genai
 import json
-
+import pytesseract
 
 
 
@@ -191,6 +197,15 @@ def claudevision(path, api_key):
     )
     return response.content[0].text
 
+def extract_text_tesseract(img_path):
+    image = Image.open(img_path)
+    text = pytesseract.image_to_string(image, lang = "spa+eng")
+    
+    #text = "test"
+    print("TEXT IN IMAGE:" + text)
+    
+    return text.strip()
+    
 
 # FLASK
 @app.route('/')
@@ -230,6 +245,10 @@ def analyze():
             geoclip_results = geoclip(temp_path)
             
             if geoclip_results:
+                
+                ocr_text = extract_text_tesseract(temp_path)
+                print(ocr_text)
+                
                 response_data = {
                     'source': 'geoclip',
                     'geoclip': geoclip_results
@@ -287,4 +306,4 @@ if __name__ == '__main__':
             api_key = input("paste your anthropic API KEY: ").strip()
             claudevision(path, api_key)
     else:
-        app.run(debug=True, host='0.0.0.0', port=5502)
+        app.run(debug=True, host='0.0.0.0', port=5504)

@@ -15,12 +15,24 @@ body {
 }
 
 .box {
+    max-width: 1500px;
+    width: 100%;
+    background: #beb3a0;
+    border: 1px solid #ff6600;
+    padding: 22px 20px 28px;
+    box-shadow: 6px 6px 0 rgba(0,0,0,0.2);
+    display: flex;
+    gap: 16px;
+}
+
+.innerbox {
     max-width: 680px;
     width: 100%;
-    background: #fffcf7;
-    border: 1px solid #b8aa92;
+    background: #beb3a0;
+    border: 1px solid #85776e;
     padding: 22px 20px 28px;
-    box-shadow: 6px 6px 0 rgba(0,0,0,0.06);
+    box-shadow: 6px 6px 0 rgba(0,0,0,0.2);
+
 }
 
 h1 {
