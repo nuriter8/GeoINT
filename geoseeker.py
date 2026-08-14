@@ -54,9 +54,11 @@ import os
 
 import easyocr
 
-print("loading EasyOCR model...")
-ocr_reader = easyocr.Reader(['en', 'es'], gpu=False)
-print("easyocr loaded")
+
+import gc
+import torch
+
+
 
 
 
@@ -152,13 +154,29 @@ def preprocess_image(img_path):
     # tileGridSize: divides img in blocks of 8x8, equalizes each one separately
     
     clahe = cv2.createCLAHE(clipLimit= 3.0, tileGridSize= (8,8))
+    #save_step(clahe, 5, "cv2.createCLAHE(clipLimit= 3.0, tileGridSize= (8,8))")
+    
+    
     l_corrected = clahe.apply(l)
+    save_step(l_corrected, 6, "clahe.apply(l)")
+        
+        
     balanzed = cv2.merge((l_corrected, a, b))
+    save_step(balanzed, 7, "cv2.merge((l_corrected, a, b))")
+     
+     
     balanzed = cv2.cvtColor(balanzed, cv2.COLOR_LAB2BGR)
+    save_step(balanzed, 8, "cv2.cvtColor(balanzed, cv2.COLOR_LAB2BGR)")
+    
     
     # SHARPNESS
     no_focus = cv2.GaussianBlur(balanzed, (0, 0), sigmaX=3)
+    save_step(no_focus, 9, "cv2.GaussianBlur(balanzed, (0, 0), sigmaX=3)")
+        
+        
     sharp = cv2.addWeighted(balanzed, 1.5, no_focus, -0.5, 0)
+    save_step(sharp, 10, "cv2.addWeighted(balanzed, 1.5, no_focus, -0.5, 0)")
+        
     
     return sharp
 
@@ -247,13 +265,17 @@ def show_coords(method, lat, lon):
     print(f"COORDINATES WITH {method}, {lat} , {lon}")
     print(f"https://www.google.com/maps?q={lat},{lon} \n")
 
-print("loading GEOCLIP model, can take some time...")
-geoclip_model = GeoCLIP()
-print("geoclip loaded")
+
 
 def geoclip(path):
     top_k = 5
     try:
+        
+        print("loading GEOCLIP model, can take some time...")
+        geoclip_model = GeoCLIP()
+        print("geoclip loaded")
+
+
         top_pred_gps, top_pred_prob = geoclip_model.predict(path, top_k=top_k)
         results = []
         for i in range(top_k):
@@ -272,6 +294,13 @@ def geoclip(path):
         print(f"Error in GEOCLIP: {e}")
         traceback.print_exc()
         return None
+    
+    finally:
+        
+        if geoclip_model is not None:
+            del geoclip_model
+            
+        gc.collect()
 
 def claudevision(path, api_key):
     with open(path, "rb") as f:
@@ -326,18 +355,38 @@ def extract_text_tesseract(img_path):
     
 def extract_text_easyocr(img_path):
     
+    print("loading EasyOCR model...")
+    ocr_reader = easyocr.Reader(['en', 'es'], gpu=False)
+    print("easyocr loaded")
     
-    results = ocr_reader.readtext(img_path)
+    
+    
+    try:
+        results = ocr_reader.readtext(img_path)
 
-    texts = [text for (_, text, trust) in results if trust > 0.35]
+        texts = [text for (_, text, trust) in results if trust > 0.35]
 
-    if not texts:
-        return ""
+        if not texts:
+            return ""
 
-    final_text = " | ".join(texts)
-    print("TEXT IN IMAGE (EasyOCR):" + final_text)
+        final_text = " | ".join(texts)
+        print("TEXT IN IMAGE (EasyOCR):" + final_text)
 
-    return final_text
+        return final_text
+
+
+    finally:
+        # free memory 
+        
+        del ocr_reader
+        
+        # since I dont use CPU this is not needed
+        # if torch.cuda.is_available():
+        #    torch.cuda.empty_cache()
+            
+        gc.collect()
+        
+        print("EasyOCR unloaded")
 
 # FLASK
 @app.route('/')
@@ -380,10 +429,14 @@ def analyze():
       
             sharp = preprocess_image(temp_path)
             save_preprocessed(sharp, preprocess_path)
+            
+            print("DEBUG: about to use geoclip")
             geoclip_results = geoclip(preprocess_path)
 
             if geoclip_results:
                 ocr_text = extract_text_easyocr(preprocess_path)
+                
+                
                 print(ocr_text)
                 response_data = {
                     'source': 'geoclip',
@@ -446,4 +499,4 @@ if __name__ == '__main__':
             api_key = input("paste your anthropic API KEY: ").strip()
             claudevision(path, api_key)
     else:
-        app.run(debug=True, host='0.0.0.0', port=5518, use_reloader=False)
+        app.run(debug=True, host='0.0.0.0', port=5511)
