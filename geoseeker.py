@@ -50,6 +50,7 @@ import json
 import pytesseract
 import cv2
 import numpy as np
+import os
 
 import easyocr
 
@@ -64,22 +65,88 @@ app = Flask(__name__, static_folder='webpage', static_url_path='')
 CORS(app)
 
 def save_preprocessed(cv2_image, path):
-
     rgb = cv2.cvtColor(cv2_image, cv2.COLOR_BGR2RGB)
     pil_img = Image.fromarray(rgb)
     pil_img.save(path, "JPEG", quality=95)
     
     
+def save_step(img, step_number, instruction, folder="preprocess"):
+    
+    os.makedirs(folder, exist_ok=True)
+
+    output = img.copy()
+
+    if len(output.shape) == 2:
+        output = cv2.cvtColor(
+            output,
+            cv2.COLOR_GRAY2BGR
+        )
+
+    font = cv2.FONT_HERSHEY_SIMPLEX
+   
+
+    cv2.putText(
+        
+        output,
+        f"STEP {step_number}",
+        (20, 110),
+        font,
+        3.0,
+        (0, 0, 255),
+        2,
+        cv2.LINE_AA
+    )
+
+    cv2.putText(
+        output,
+        instruction,
+        (20, 70),
+        font,
+        0.6,
+        (0, 0, 255),
+        2,
+        cv2.LINE_AA
+    )
+
+    filename = os.path.abspath(
+        os.path.join(
+            folder,
+            f"step{step_number}.jpg"
+        )
+    )
+
+    print("-"*30)
+    print("STEP:", step_number)
+    print("FILENAME:", repr(filename))
+    print("EXTENSION:", os.path.splitext(filename)[1])
+    print("SHAPE:", output.shape)
+    print("WRITER JPG:", cv2.haveImageWriter(".jpg"))
+    print("-"*30)
+
+    success = cv2.imwrite(filename, output)
+
+    print("IMWRITE RESULT:", success)
+
+    if not success:
+        raise RuntimeError(
+            f"Could not save image: {filename}"
+        )
+ 
     
     
 def preprocess_image(img_path):
     
     img = cv2.imread(img_path)
-    
+    save_step(img, 1, "cv2.cvtColor(img, cv2.COLOR_BGR2LAB)")
+     
     # clahe: separates L (LIGHT) and A, B (COLOR INFO)
     lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
-    l, a, b = cv2.split(lab)
+   
     
+    l, a, b = cv2.split(lab)
+    save_step(l, 2, "l: cv2.cvtColor(img, cv2.COLOR_BGR2LAB)")
+    save_step(a, 3, "a: cv2.cvtColor(img, cv2.COLOR_BGR2LAB)")
+    save_step(b, 4, "b: cv2.cvtColor(img, cv2.COLOR_BGR2LAB)")
     
     # clipLimit: contrast
     # tileGridSize: divides img in blocks of 8x8, equalizes each one separately
@@ -262,7 +329,6 @@ def extract_text_easyocr(img_path):
     
     results = ocr_reader.readtext(img_path)
 
-   
     texts = [text for (_, text, trust) in results if trust > 0.35]
 
     if not texts:
@@ -380,4 +446,4 @@ if __name__ == '__main__':
             api_key = input("paste your anthropic API KEY: ").strip()
             claudevision(path, api_key)
     else:
-        app.run(debug=True, host='0.0.0.0', port=5500, use_reloader=False)
+        app.run(debug=True, host='0.0.0.0', port=5518, use_reloader=False)
