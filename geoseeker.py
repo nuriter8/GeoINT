@@ -3,7 +3,7 @@
 # 1. EXIF: if the photo has embedded GPS (metadata), I Just extract it for free (no ai)
 # 2. GeoCLIP: CLIP style model (no ai), predicts coordinates based on visual content of the picture
 # 3. Claude vision: multimodal model that reasons with visual cues (buildings, roads, architecture, panels)
-# 4. Tesseract: OCR, program to extract names, licence plates, traffic signs...
+# 4. Tesseract (not as accurate), easyocr: OCR, program to extract names, licence plates, traffic signs...
 # 5. Using plantNet (to-do)
 
 #reliability
@@ -34,6 +34,12 @@
 # pip install "numpy<2.0" --force-reinstall
 
 
+
+
+
+
+# sudo sync
+# sudo sysctl -w vm.drop_caches=3
 
 import sys
 import os
@@ -102,9 +108,9 @@ def save_step(img, step_number, instruction, folder="preprocess"):
     cv2.putText(
         output,
         instruction,
-        (20, 70),
+        (20, 150),
         font,
-        0.6,
+        1.5,
         (0, 0, 255),
         2,
         cv2.LINE_AA
@@ -343,6 +349,9 @@ def claudevision(path, api_key):
     )
     return response.content[0].text
 
+
+
+
 def extract_text_tesseract(img_path):
     image = Image.open(img_path)
     text = pytesseract.image_to_string(image, lang="spa+eng+fra+deu+ita")
@@ -351,6 +360,9 @@ def extract_text_tesseract(img_path):
 
     
     return text.strip()
+    
+def extractedtext_corrector(texts):
+    print("text from easyocr is not accurate, attempting to fix it..")
     
     
 def extract_text_easyocr(img_path):
@@ -364,13 +376,76 @@ def extract_text_easyocr(img_path):
     try:
         results = ocr_reader.readtext(img_path)
 
-        texts = [text for (_, text, trust) in results if trust > 0.35]
+        #texts = [text for (_, text, trust) in results if trust > 0.35]
 
-        if not texts:
+        detections = [(bbox, text, confidence)
+                      for bbox, text, confidence in results
+                      if confidence > 0.35
+                      ]
+            
+        if not detections:
             return ""
+        
+        words = []
+        
+        for bbox, text, confidence in detections:
+            x = min(point[0] for point in bbox)
+            y = min(point[1] for point in bbox)
+            height = max(point[1] for point in bbox) - y
 
-        final_text = " | ".join(texts)
-        print("TEXT IN IMAGE (EasyOCR):" + final_text)
+            words.append({
+                "text": text,
+                "x": x,
+                "y": y,
+                "height": height,
+                "confidence": confidence
+            })
+            
+            print(f"{text} in {x}, {y}, height: {height}")
+            
+        print("\n\n")
+            
+            
+            
+        words.sort(key=lambda w: w["y"])
+        
+        print(words)
+        print('\n')
+        
+        lines = []
+
+        for word in words:
+
+            added = False
+
+            for line in lines:
+
+                avg_y = sum(w["y"] for w in line) / len(line)
+                avg_height = sum(w["height"] for w in line) / len(line)
+
+                # IF IT'S IN SAME HEIGHT IT'S PART OF THE SAME TEXT
+                if abs(word["y"] - avg_y) < avg_height * 0.5:
+                    line.append(word)
+                    added = True
+                    break
+
+            if not added:
+                lines.append([word])
+
+        # order each line:
+        for line in lines:
+            line.sort(key=lambda w: w["x"])
+
+        # reconstruct
+        final_lines = [
+            " ".join(word["text"] for word in line)
+            for line in lines
+        ]
+
+        final_text = "\n".join(final_lines)
+
+        print("TEXT IN IMAGE (EasyOCR):")
+        print(final_text + str(".. end"))
 
         return final_text
 
@@ -437,11 +512,11 @@ def analyze():
                 ocr_text = extract_text_easyocr(preprocess_path)
                 
                 
-                print(ocr_text)
+                print("\n \n start ocr text " + ocr_text + str(" end ocr text"))
                 response_data = {
                     'source': 'geoclip',
                     'geoclip': geoclip_results,
-                    'ocr': ocr_text
+                    'ocrOutput': ocr_text
                 }
                 return jsonify(response_data)
 
@@ -499,4 +574,4 @@ if __name__ == '__main__':
             api_key = input("paste your anthropic API KEY: ").strip()
             claudevision(path, api_key)
     else:
-        app.run(debug=True, host='0.0.0.0', port=5511)
+        app.run(debug=True, host='0.0.0.0', port=5513)
