@@ -45,6 +45,7 @@ import sys
 import os
 import base64
 import traceback
+import types
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from PIL import Image
@@ -57,13 +58,17 @@ import pytesseract
 import cv2
 import numpy as np
 import os
-
+from google import genai
 import easyocr
-
+import ast
 
 import gc
 import torch
+import re
 
+
+import google.generativeai as genai
+from google import genai
 
 
 
@@ -462,6 +467,71 @@ def extract_text_easyocr(img_path):
         gc.collect()
         
         print("EasyOCR unloaded")
+        
+        
+        
+
+def filter_ocr(gemini_api, texts):
+
+    client = genai.Client(api_key=gemini_api)
+
+    prompt = f"""
+    
+    The following text belongs to an image whose location is unknown:
+
+    {texts}
+
+    It may contain:
+    - spelling errors
+    - duplicated words
+    - random/wrong characters
+    - incomplete or split words
+    - irrelevant data
+
+    Clean and filter the OCR text.
+
+    Keep information that could be useful for identifying the location,
+    especially restaurant names, cafe names, business names, street names,
+    city names, place names, hotels, landmarks and addresses.
+
+    Correct obvious OCR errors when reasonably possible.
+
+    Return ONLY a JSON array containing the useful cleaned text.
+    Do not add explanations.
+    Do not use markdown.
+
+    Example:
+    ["Restaurant", "Cafe du Marche", "Brasserie"]
+    """
+
+    response = client.models.generate_content(
+        model="gemini-3.6-flash",
+        contents=prompt
+    )
+
+    result = response.text.strip()
+
+    print("this is filtered:", result, "end filtered")
+
+   
+    match = re.search(r'\[.*\]', result, re.DOTALL)
+
+    if not match:
+        
+        print("No JSON list found in Gemini response")
+        return []
+
+    list_text = match.group(0)
+
+    try:
+        return json.loads(list_text)
+
+    except json.JSONDecodeError as e:
+        print("ERROR parsing Gemini response:", e)
+        return []
+
+    
+    
 
 # FLASK
 @app.route('/')
@@ -512,11 +582,18 @@ def analyze():
                 ocr_text = extract_text_easyocr(preprocess_path)
                 
                 
-                print("\n \n start ocr text " + ocr_text + str(" end ocr text"))
+                gemini_api = ".."
+                
+                ocr_text_filtered = filter_ocr(gemini_api, ocr_text)
+                ocr_text_filtered = "\n".join(ocr_text_filtered)
+                
+                print("\n\n\n" + ocr_text + " TO " + ocr_text_filtered)
+                
+                print("\n \n start ocr text " + ocr_text_filtered + str(" end ocr text"))
                 response_data = {
                     'source': 'geoclip',
                     'geoclip': geoclip_results,
-                    'ocrOutput': ocr_text
+                    'ocrOutput': ocr_text_filtered
                 }
                 return jsonify(response_data)
 
@@ -574,4 +651,4 @@ if __name__ == '__main__':
             api_key = input("paste your anthropic API KEY: ").strip()
             claudevision(path, api_key)
     else:
-        app.run(debug=True, host='0.0.0.0', port=5513)
+        app.run(debug=True, host='0.0.0.0', port=5518)
