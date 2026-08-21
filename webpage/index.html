@@ -68,10 +68,28 @@
 
         <div class="innerbox">
 
+            <div class="panel vis-panel" id="visionPanel">
+                <div class="eyebrow" style="margin-bottom:8px;">
+                    <span class="dot"></span> Gemini (accurate approach)
+                </div>
+
+                <label for="geminiApiKey">Gemini API key</label>
+                <input type="password" id="geminiApiKey" placeholder="..." />
+
+                <div class="actions">
+                    <button id="geminiBtn">filter clues</button>
+                </div>
+
+                <div class="status" id="visionStatus"></div>
+                <div class="vis-output" id="visionOutput"></div>
+            </div>
+
             <div class="clues" id="clues" style="display:none;">
                 <div class="sub">CLUES</div>
                 <div id="ocrOutput"></div>
             </div>
+
+
 
         </div>
 

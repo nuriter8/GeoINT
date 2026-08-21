@@ -473,64 +473,74 @@ def extract_text_easyocr(img_path):
 
 def filter_ocr(gemini_api, texts):
 
-    client = genai.Client(api_key=gemini_api)
-
-    prompt = f"""
-    
-    The following text belongs to an image whose location is unknown:
-
-    {texts}
-
-    It may contain:
-    - spelling errors
-    - duplicated words
-    - random/wrong characters
-    - incomplete or split words
-    - irrelevant data
-
-    Clean and filter the OCR text.
-
-    Keep information that could be useful for identifying the location,
-    especially restaurant names, cafe names, business names, street names,
-    city names, place names, hotels, landmarks and addresses.
-
-    Correct obvious OCR errors when reasonably possible.
-
-    Return ONLY a JSON array containing the useful cleaned text.
-    Do not add explanations.
-    Do not use markdown.
-
-    Example:
-    ["Restaurant", "Cafe du Marche", "Brasserie"]
-    """
-
-    response = client.models.generate_content(
-        model="gemini-3.6-flash",
-        contents=prompt
-    )
-
-    result = response.text.strip()
-
-    print("this is filtered:", result, "end filtered")
-
-   
-    match = re.search(r'\[.*\]', result, re.DOTALL)
-
-    if not match:
-        
-        print("No JSON list found in Gemini response")
-        return []
-
-    list_text = match.group(0)
 
     try:
-        return json.loads(list_text)
+        client = genai.Client(api_key=gemini_api)
 
-    except json.JSONDecodeError as e:
-        print("ERROR parsing Gemini response:", e)
-        return []
+        prompt = f"""
+        
+        The following text belongs to an image whose location is unknown:
+
+        {texts}
+
+        It may contain:
+        - spelling errors
+        - duplicated words
+        - random/wrong characters
+        - incomplete or split words
+        - irrelevant data
+
+        Clean and filter the OCR text.
+
+        Keep information that could be useful for identifying the location,
+        especially restaurant names, cafe names, business names, street names,
+        city names, place names, hotels, landmarks and addresses.
+
+        Correct obvious OCR errors when reasonably possible.
+
+        Return ONLY a JSON array containing the useful cleaned text.
+        Do not add explanations.
+        Do not use markdown.
+
+        Example:
+        ["Restaurant", "Cafe du Marche", "Brasserie"]
+        """
+
+        response = client.models.generate_content(
+            model="gemini-3.6-flash",
+            contents=prompt
+        )
+        
+        print(response)
+
+        result = response.text.strip()
+        print(result)
+
+        print("this is filtered:", result, "end filtered")
 
     
+        match = re.search(r'\[.*\]', result, re.DOTALL)
+
+        if not match:
+            
+            print("No JSON list found in Gemini response")
+            return []
+
+        list_text = match.group(0)
+        
+
+        try:
+            return json.loads(list_text)
+
+        except json.JSONDecodeError as e:
+            print("ERROR parsing Gemini response:", e)
+            return []
+
+    
+    except Exception as e:
+        
+        print("gemini api error " + e)
+        return []
     
 
 # FLASK
@@ -542,6 +552,104 @@ def index():
 def static_files(path):
     return send_from_directory('webpage', path)
 
+
+
+
+
+@app.route('/api/preprocess', methods=['POST'])
+def preprocess():
+    try:
+       
+        if 'image' not in request.files:
+            return jsonify({'error': 'no image uploaded'}), 400
+
+        file = request.files['image']
+        
+        if file.filename == '':
+            return jsonify({'error': 'no file selected'}), 400
+        
+        
+        temp_path = 'temp_image.jpg'
+        file.save(temp_path)
+        
+        try:
+            
+            preprocessed_image = preprocess_image(temp_path)
+            preprocess_path = 'temp_img_preprocessed.jpg'
+            save_preprocessed(preprocessed_image, preprocess_path)
+            
+            return jsonify({'success': True, 'message': 'Image preprocessed successfully'})
+        
+        finally:
+            
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+        
+    except Exception as e:
+        print("error in preprocess:", str(e))
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+           
+
+@app.route('/api/filter-clues', methods=['POST'])
+def filter_clues():
+    try:
+        if 'image' not in request.files:
+            return jsonify({'error': 'No image uploaded'}), 400
+
+        gemini_api = request.form.get('gemini_api')
+
+        if not gemini_api:
+            return jsonify({'error': 'Gemini API key required'}), 400
+
+
+
+        file = request.files['image']
+
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+
+        temp_path = 'temp_image.jpg'
+        #preprocess_path = 'temp_img_preprocessed.jpg'
+
+        file.save(temp_path)
+        preprocess_path = 'temp_img_preprocessed.jpg'
+        
+        
+        try:
+            
+            if os.path.exists(preprocess_path):
+                image_to_use = preprocess_path
+            
+            
+            else:
+                sharp = preprocess_image(temp_path)
+                save_preprocessed(sharp, preprocess_path)
+                image_to_use = preprocess_path
+                
+            ocr_text = extract_text_easyocr(image_to_use)
+
+            
+            ocr_text_filtered = filter_ocr(
+                gemini_api,
+                ocr_text
+            )
+
+            ocr_text_filtered = "\n".join(ocr_text_filtered)
+
+            return jsonify({
+                'ocrOutput': ocr_text_filtered
+            })
+
+        finally:
+            
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+    except Exception as e:
+        print(f"ERROR in filter_clues: {str(e)}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
     
     
 @app.route('/api/analyze', methods=['POST'])
@@ -572,20 +680,41 @@ def analyze():
                 return jsonify(response_data)
 
       
-            sharp = preprocess_image(temp_path)
-            save_preprocessed(sharp, preprocess_path)
+            #sharp = preprocess_image(temp_path)
+            #save_preprocessed(sharp, preprocess_path)
+            
+            if os.path.exists(preprocess_path):
+                image_to_use = preprocess_path
+                
+            else:
+                sharp = preprocess_image(temp_path)
+                save_preprocessed(sharp, preprocess_path)
+                image_to_use = preprocess_path
             
             print("DEBUG: about to use geoclip")
             geoclip_results = geoclip(preprocess_path)
+            
+            
+            
 
             if geoclip_results:
                 ocr_text = extract_text_easyocr(preprocess_path)
                 
+                gemini_api = request.form.get('gemini_api')
                 
-                gemini_api = ".."
                 
-                ocr_text_filtered = filter_ocr(gemini_api, ocr_text)
-                ocr_text_filtered = "\n".join(ocr_text_filtered)
+                
+                if gemini_api:
+               
+                    ocr_text_filtered = filter_ocr(gemini_api, ocr_text)
+                    ocr_text_filtered = "\n".join(ocr_text_filtered)
+                        
+                
+                else:
+                    
+                    print("no api key, skipping OCR + filtering ...")
+                    ocr_text_filtered = ""
+                
                 
                 print("\n\n\n" + ocr_text + " TO " + ocr_text_filtered)
                 
@@ -651,4 +780,4 @@ if __name__ == '__main__':
             api_key = input("paste your anthropic API KEY: ").strip()
             claudevision(path, api_key)
     else:
-        app.run(debug=True, host='0.0.0.0', port=5518)
+        app.run(debug=True, host='0.0.0.0', port=5519)

@@ -19,6 +19,9 @@
     const visionOutput = document.getElementById('visionOutput');
     const apiKeyInput = document.getElementById('apiKey');
 
+    const geminiAPIKey = document.getElementById('geminiApiKey');
+    const geminiBtn = document.getElementById('geminiBtn');
+
 
     let currentFile = null;
 
@@ -46,18 +49,34 @@
         currentFile = file;
         const url = URL.createObjectURL(file);
 
-        clues.style.display = 'block';
-        ocrOutput.textContent = 'scanning clues...'
+        clues.style.display = 'none';
+        ocrOutput.textContent = ''
+    
 
         previewImg.src = url;
         preview.style.display = 'block';
         analyzeBtn.disabled = false;
         resetBtn.style.display = 'inline-block';
         resultsPanel.style.display = 'none';
-        visionPanel.style.display = 'none';
+        visionPanel.style.display = 'block';
         status.textContent = '';
         status.className = 'status';
         scanbar.classList.remove('locked');
+
+
+        const formData = new FormData();
+        formData.append('image', file);
+
+        fetch('/api/preprocess', {
+            method: 'POST',
+            body: formData
+        }).then(r => {
+            if (!r.ok) throw new Error('Preprocessing failed');
+        }).catch(e => {
+            console.error(e);
+            status.textContent = 'Preprocessing error';
+        });
+       
     }
 
     function resetAll() {
@@ -98,10 +117,21 @@
         status.className = 'status';
         status.textContent = 'Analyzing image...';
         resultsPanel.style.display = 'none';
-        visionPanel.style.display = 'none';
+        // visionPanel.style.display = 'none';
 
         const formData = new FormData();
         formData.append('image', currentFile);
+
+        
+        //const geminiApi = geminiAPIKey.value.trim()
+
+        //if (geminiApi){
+
+         //   formData.append('gemini_api', geminiApi);
+        // }
+
+        
+
 
         try {
             const response = await fetch('/api/analyze', {
@@ -139,7 +169,13 @@
 
                 if (data.ocrOutput && data.ocrOutput.trim()) {
                     ocrOutput.textContent = data.ocrOutput;
+
+                    clues.style.display = 'block';
+
+
                 } else {
+
+                    clues.style.display = 'none';
                     ocrOutput.textContent = 'No text detected.';
                 }
                 
@@ -149,7 +185,7 @@
                     resultsBody.appendChild(buildResultCard(p.lat, p.lon, p.prob));
                 });
                 resultsPanel.style.display = 'block';
-                visionPanel.style.display = 'block';
+                // visionPanel.style.display = 'block';
 
 
             } else {
@@ -162,6 +198,79 @@
             status.textContent = 'Error: ' + error.message;
         } finally {
             analyzeBtn.disabled = false;
+        }
+    });
+
+
+    geminiBtn.addEventListener('click', async () => {
+
+        const apiKey = geminiAPIKey.value.trim();
+
+        if (!apiKey) {
+            visionStatus.className = 'status err';
+            visionStatus.textContent = 'Please enter your Gemini API key';
+            return;
+        }
+
+        if (!currentFile) {
+            visionStatus.className = 'status err';
+            visionStatus.textContent = 'Please load an image first';
+            return;
+        }
+
+        geminiBtn.disabled = true;
+        visionStatus.className = 'status';
+        visionStatus.textContent = 'Gemini is filtering clues...';
+
+        try {
+
+            const formData = new FormData();
+
+            formData.append('image', currentFile);
+            formData.append('gemini_api', apiKey);
+
+            const response = await fetch('/api/filter-clues', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    data.error || 'Gemini filtering failed'
+                );
+            }
+
+            if (data.ocrOutput && data.ocrOutput.trim()) {
+
+                ocrOutput.textContent = data.ocrOutput;
+
+                clues.style.display = 'block';
+
+                visionStatus.textContent = '';
+
+            } else {
+
+                clues.style.display = 'none';
+
+                visionStatus.className = 'status err';
+                visionStatus.textContent = 'No useful clues found';
+
+            }
+
+        } catch (error) {
+
+            console.error('Gemini error:', error);
+
+            visionStatus.className = 'status err';
+            visionStatus.textContent =
+                'Gemini error: ' + error.message;
+
+        } finally {
+
+            geminiBtn.disabled = false;
+
         }
     });
 
