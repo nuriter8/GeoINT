@@ -1,0 +1,20 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+Pillow
+requests
+geoclip
+anthropic
+
+torch==2.2.0
+torchvision==0.17.0
+numpy<2
+
+Flask
+flask-cors
+pytesseract
+opencv-python<5
+transformers==4.36.2
+easyocr
+
+google-generativeai==0.8.6
+google-genai==2.16.0
