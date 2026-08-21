@@ -1,5 +1,5 @@
 # GeoSeeker
-<img width="1208" height="942" alt="Image" src="https://github.com/user-attachments/assets/57a58c34-b274-40f9-bf2e-91f60eab854e" />
+<img width="1685" height="939" alt="geoseeker" src="https://github.com/user-attachments/assets/83a362bb-7a7f-4297-a1b1-6ab12b927c61" />
 
 **GeoSeeker** is a Python tool that geolocates a photo using three fallback layers of increasing complexity — starting with exact metadata, and falling back to AI-based visual reasoning when no metadata is available.
 
